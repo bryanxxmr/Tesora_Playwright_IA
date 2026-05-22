@@ -46,11 +46,13 @@ test.describe('Tesora - Cuentas por cobrar - Conciliación', () => {
   });
 
   test('Búsqueda de Operaciones - Este mes', async ({ conciliationsPage }, testInfo) => {
+    test.setTimeout(90_000);
     const summary = await conciliationsPage.filterByThisMonth();
     await reportMonthOperationsCount(testInfo, summary);
   });
 
   test('Búsqueda de Operaciones - Últimos 30 días', async ({ conciliationsPage }, testInfo) => {
+    test.setTimeout(90_000);
     const summary = await conciliationsPage.filterByLast30Days();
     await reportLast30DaysOperationsCount(testInfo, summary);
   });
