@@ -160,6 +160,43 @@ export class ConciliationsPage extends BasePage {
     return serie;
   }
 
+  async selectComprobantesUntilConciliarEnabled(): Promise<string[]> {
+    const rows = this.page
+      .locator('bcp-table-row')
+      .filter({ has: this.page.locator('input[type="checkbox"][id^="bcp-cb-"]') })
+      .filter({ has: this.page.locator('p') });
+
+    await rows.first().waitFor({ state: 'attached', timeout: 10_000 });
+    const count = await rows.count();
+
+    if (count === 0) {
+      throw new Error('No hay comprobantes disponibles en el modal de conciliación');
+    }
+
+    const selected: string[] = [];
+
+    for (let i = 0; i < count; i++) {
+      if (await this.modalConciliarButton.isEnabled()) break;
+
+      const row = rows.nth(i);
+      const serie = (await row.locator('p').first().innerText()).trim();
+      const label = row.locator('label[for^="bcp-cb-"]').first();
+      await label.evaluate((el: HTMLElement) => el.click());
+      selected.push(serie);
+      logger.info(`  ↳ Comprobante marcado [${i + 1}/${count}]: ${serie}`);
+
+      await this.page.waitForTimeout(300);
+    }
+
+    if (!(await this.modalConciliarButton.isEnabled())) {
+      throw new Error(
+        `Tras seleccionar los ${selected.length} comprobantes disponibles, el botón "Conciliar" sigue deshabilitado. La data de prueba no permite conciliación completa.`,
+      );
+    }
+
+    return selected;
+  }
+
   async getConciliationStatus(): Promise<ConciliationStatusInfo> {
     await expect(this.resultSummaryAmounts).toBeVisible({ timeout: 10_000 });
     const titles = await this.resultSummaryAmounts
@@ -404,8 +441,9 @@ export class ConciliationsPage extends BasePage {
     await this.openFirstIncomeConciliation();
     await this.switchToVerTodos();
 
-    const comprobante = await this.selectFirstComprobante();
-    logger.info(`Comprobante capturado: ${comprobante}`);
+    const seleccionados = await this.selectComprobantesUntilConciliarEnabled();
+    const comprobante = seleccionados.join(', ');
+    logger.info(`Comprobante(s) capturados: ${comprobante}`);
 
     const { status, label, percent } = await this.getConciliationStatus();
     logger.info(`Estado pre-confirmación: ${status} (${label} ${percent})`);
