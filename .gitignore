@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# Playwright MCP artifacts (may contain credentials in page snapshots)
+.playwright-mcp/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+
+# Claude Code (kept local; not portable to work machine)
+.claude/
