@@ -39,7 +39,6 @@ export class ConciliationsPage extends BasePage {
   private readonly firstComprobanteRow: Locator;
   private readonly firstComprobanteCheckbox: Locator;
   private readonly firstComprobanteLabel: Locator;
-  private readonly conciliationModal: Locator;
   private readonly modalConciliarButton: Locator;
   private readonly resultSummary: Locator;
   private readonly resultSummaryAmounts: Locator;
@@ -75,13 +74,9 @@ export class ConciliationsPage extends BasePage {
       has: this.firstComprobanteCheckbox,
     });
 
-    this.conciliationModal = page
-      .locator('.p-dialog')
-      .filter({ has: page.locator('.result-summary') });
-    this.modalConciliarButton = this.conciliationModal.getByRole('button', {
-      name: 'Conciliar',
-      exact: true,
-    });
+    this.modalConciliarButton = page
+      .getByRole('button', { name: 'Conciliar', exact: true })
+      .last();
 
     this.resultSummary = page.locator('.result-summary');
     this.resultSummaryAmounts = this.resultSummary.locator(
@@ -210,7 +205,7 @@ export class ConciliationsPage extends BasePage {
       );
     }
 
-    await expect(this.conciliationModal).toBeHidden({ timeout: 15_000 });
+    await expect(this.modalConciliarButton).toBeHidden({ timeout: 15_000 });
     await expect(this.heading).toBeVisible({ timeout: 15_000 });
 
     return { apiStatus };
