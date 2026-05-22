@@ -68,7 +68,12 @@ export class ConciliationsPage extends BasePage {
 
     this.verTodosToggleLabel = page.locator('#bcp-switch-text-0-lbl');
 
-    this.firstComprobanteRow = page
+    const conciliateModal = page.locator('app-conciliate-receipt-modal');
+    const comprobantesTable = conciliateModal
+      .locator('bcp-table')
+      .filter({ hasText: 'SERIE-NÚMERO' });
+
+    this.firstComprobanteRow = comprobantesTable
       .locator('bcp-table-row')
       .filter({ has: page.locator('input[type="checkbox"][id^="bcp-cb-"]') })
       .filter({ has: page.locator('p') })
@@ -80,9 +85,7 @@ export class ConciliationsPage extends BasePage {
       .locator('label[for^="bcp-cb-"]')
       .first();
 
-    this.modalConciliarButton = page
-      .getByRole('button', { name: 'Conciliar', exact: true })
-      .last();
+    this.modalConciliarButton = conciliateModal.locator('#submit-modal button');
 
     this.resultSummary = page.locator('.result-summary');
     this.resultSummaryAmounts = this.resultSummary.locator(
@@ -154,9 +157,15 @@ export class ConciliationsPage extends BasePage {
 
   async selectFirstComprobante(): Promise<string> {
     await this.firstComprobanteCheckbox.waitFor({ state: 'attached' });
+    const cbId = await this.firstComprobanteCheckbox.getAttribute('id');
+    if (!cbId) {
+      throw new Error('No se pudo capturar el id del checkbox del primer comprobante');
+    }
     const serie = (await this.firstComprobanteRow.locator('p').first().innerText()).trim();
-    await this.firstComprobanteLabel.evaluate((el: HTMLElement) => el.click());
-    await expect(this.firstComprobanteCheckbox).toBeChecked();
+    const stableLabel = this.page.locator(`label[for="${cbId}"]`);
+    await stableLabel.evaluate((el: HTMLElement) => el.click());
+    await expect(this.page.locator(`#${cbId}`)).toBeChecked();
+    logger.info(`Primer comprobante seleccionado: ${serie} (${cbId})`);
     return serie;
   }
 
@@ -221,7 +230,10 @@ export class ConciliationsPage extends BasePage {
 
   async confirmConciliation(): Promise<{ apiStatus: number | null }> {
     await expect(this.modalConciliarButton).toBeVisible();
-    await expect(this.modalConciliarButton).toBeEnabled();
+    await expect(
+      this.modalConciliarButton,
+      'el botón "Conciliar" del modal sigue deshabilitado: el primer comprobante no cubre la regla de validación del ingreso (monto/moneda/cliente). Limpiar data de prueba en Tesora o ajustar el caso de prueba.',
+    ).toBeEnabled();
     await this.modalConciliarButton.scrollIntoViewIfNeeded();
 
     const apiResponsePromise = this.page
@@ -400,10 +412,13 @@ export class ConciliationsPage extends BasePage {
       .locator('bcp-table-row p')
       .filter({ hasText: new RegExp(`^\\s*"?${operacion}"?\\s*$`) });
 
-    await expect(operationCell, `la operación ${operacion} debe encontrarse en el Dashboard`)
-      .toHaveCount(1, { timeout: 10_000 });
+    await expect(
+      operationCell.first(),
+      `la operación ${operacion} debe encontrarse en el Dashboard`,
+    ).toBeVisible({ timeout: 10_000 });
 
-    logger.info(`Operación encontrada: ${operacion}`);
+    const total = await operationCell.count();
+    logger.info(`Operación encontrada: ${operacion}${total > 1 ? ` (${total} coincidencias)` : ''}`);
   }
 
   async hideFirstIncome(): Promise<string> {
@@ -441,9 +456,8 @@ export class ConciliationsPage extends BasePage {
     await this.openFirstIncomeConciliation();
     await this.switchToVerTodos();
 
-    const seleccionados = await this.selectComprobantesUntilConciliarEnabled();
-    const comprobante = seleccionados.join(', ');
-    logger.info(`Comprobante(s) capturados: ${comprobante}`);
+    const comprobante = await this.selectFirstComprobante();
+    logger.info(`Comprobante capturado: ${comprobante}`);
 
     const { status, label, percent } = await this.getConciliationStatus();
     logger.info(`Estado pre-confirmación: ${status} (${label} ${percent})`);

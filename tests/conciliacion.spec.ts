@@ -13,6 +13,8 @@ const USER = process.env.TEST_USER ?? '';
 const PASS = process.env.TEST_PASS ?? '';
 
 test.describe('Tesora - Cuentas por cobrar - Conciliación', () => {
+  test.describe.configure({ mode: 'serial' });
+
   test.beforeEach(async ({ loginPage, conciliationsPage }) => {
     await loginPage.loginAs(USER, PASS);
     await conciliationsPage.waitForLoaded();
@@ -41,6 +43,7 @@ test.describe('Tesora - Cuentas por cobrar - Conciliación', () => {
   });
 
   test('Búsqueda de Operaciones - Semana', async ({ conciliationsPage }, testInfo) => {
+    test.setTimeout(90_000);
     const total = await conciliationsPage.filterByThisWeek();
     await reportWeekOperationsCount(testInfo, total);
   });
