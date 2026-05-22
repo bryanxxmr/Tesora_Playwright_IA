@@ -70,12 +70,15 @@ export class ConciliationsPage extends BasePage {
 
     this.firstComprobanteRow = page
       .locator('bcp-table-row')
-      .filter({ has: page.locator('input[type="checkbox"]') })
+      .filter({ has: page.locator('input[type="checkbox"][id^="bcp-cb-"]') })
+      .filter({ has: page.locator('p') })
       .first();
     this.firstComprobanteCheckbox = this.firstComprobanteRow
-      .locator('input[type="checkbox"]')
+      .locator('input[type="checkbox"][id^="bcp-cb-"]')
       .first();
-    this.firstComprobanteLabel = this.firstComprobanteRow.locator('label').first();
+    this.firstComprobanteLabel = this.firstComprobanteRow
+      .locator('label[for^="bcp-cb-"]')
+      .first();
 
     this.modalConciliarButton = page
       .getByRole('button', { name: 'Conciliar', exact: true })
