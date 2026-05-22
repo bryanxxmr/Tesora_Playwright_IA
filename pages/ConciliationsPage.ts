@@ -68,11 +68,14 @@ export class ConciliationsPage extends BasePage {
 
     this.verTodosToggleLabel = page.locator('#bcp-switch-text-0-lbl');
 
-    this.firstComprobanteCheckbox = page.locator('#bcp-cb-27');
-    this.firstComprobanteLabel = page.locator('label[for="bcp-cb-27"]');
-    this.firstComprobanteRow = page.locator('bcp-table-row', {
-      has: this.firstComprobanteCheckbox,
-    });
+    this.firstComprobanteRow = page
+      .locator('bcp-table-row')
+      .filter({ has: page.locator('input[type="checkbox"]') })
+      .first();
+    this.firstComprobanteCheckbox = this.firstComprobanteRow
+      .locator('input[type="checkbox"]')
+      .first();
+    this.firstComprobanteLabel = this.firstComprobanteRow.locator('label').first();
 
     this.modalConciliarButton = page
       .getByRole('button', { name: 'Conciliar', exact: true })
