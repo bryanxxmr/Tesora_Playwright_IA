@@ -39,6 +39,7 @@ export class ConciliationsPage extends BasePage {
   private readonly firstComprobanteRow: Locator;
   private readonly firstComprobanteCheckbox: Locator;
   private readonly firstComprobanteLabel: Locator;
+  private readonly conciliationModal: Locator;
   private readonly modalConciliarButton: Locator;
   private readonly resultSummary: Locator;
   private readonly resultSummaryAmounts: Locator;
@@ -74,9 +75,13 @@ export class ConciliationsPage extends BasePage {
       has: this.firstComprobanteCheckbox,
     });
 
-    this.modalConciliarButton = page
-      .getByRole('button', { name: 'Conciliar', exact: true })
-      .last();
+    this.conciliationModal = page
+      .locator('.p-dialog')
+      .filter({ has: page.locator('.result-summary') });
+    this.modalConciliarButton = this.conciliationModal.getByRole('button', {
+      name: 'Conciliar',
+      exact: true,
+    });
 
     this.resultSummary = page.locator('.result-summary');
     this.resultSummaryAmounts = this.resultSummary.locator(
@@ -176,13 +181,49 @@ export class ConciliationsPage extends BasePage {
     return { status, label, percent };
   }
 
-  async confirmConciliation(): Promise<void> {
+  async confirmConciliation(): Promise<{ apiStatus: number | null }> {
     await expect(this.modalConciliarButton).toBeVisible();
     await expect(this.modalConciliarButton).toBeEnabled();
     await this.modalConciliarButton.scrollIntoViewIfNeeded();
+
+    const apiResponsePromise = this.page
+      .waitForResponse(
+        (resp) =>
+          /apis\.tesorabcp\.com\/conciliation\/v\d+\/conciliation\b/.test(resp.url()) &&
+          resp.request().method() === 'POST',
+        { timeout: 15_000 },
+      )
+      .catch(() => null);
+
     await this.modalConciliarButton.click();
-    await expect(this.modalConciliarButton).toBeHidden({ timeout: 15_000 });
+
+    const response = await apiResponsePromise;
+    const apiStatus = response ? response.status() : null;
+    if (response && (apiStatus! < 200 || apiStatus! >= 300)) {
+      throw new Error(
+        `Conciliación falló: el backend respondió ${apiStatus} para ${response.url()}`,
+      );
+    }
+    if (!response) {
+      logger.warn(
+        'No se capturó respuesta del API de conciliación (timeout 15s). Continuando con verificación de UI.',
+      );
+    }
+
+    await expect(this.conciliationModal).toBeHidden({ timeout: 15_000 });
     await expect(this.heading).toBeVisible({ timeout: 15_000 });
+
+    return { apiStatus };
+  }
+
+  async expectIncomeNoLongerPending(operacion: string): Promise<void> {
+    await expect(async () => {
+      const texts = await this.firstIncomeRow.locator('p').allInnerTexts();
+      const currentOp = texts.map((t) => t.trim()).find((t) => /^\d+$/.test(t));
+      expect(currentOp, `la operación ${operacion} sigue como primer ingreso pendiente`).not.toBe(
+        operacion,
+      );
+    }).toPass({ timeout: 10_000 });
   }
 
   async registerCashIncome(data: RegisterCashIncomeData): Promise<void> {
@@ -368,8 +409,13 @@ export class ConciliationsPage extends BasePage {
     const { status, label, percent } = await this.getConciliationStatus();
     logger.info(`Estado pre-confirmación: ${status} (${label} ${percent})`);
 
-    await this.confirmConciliation();
-    logger.info(`Conciliación confirmada -> operación: ${operacion} | comprobante: ${comprobante} | estado: ${status}`);
+    const { apiStatus } = await this.confirmConciliation();
+    logger.info(
+      `Modal cerrado -> operación: ${operacion} | comprobante: ${comprobante} | preview: ${status} | API: ${apiStatus ?? 'n/a'}`,
+    );
+
+    await this.expectIncomeNoLongerPending(operacion);
+    logger.info(`Persistencia verificada: la operación ${operacion} ya no aparece como pendiente`);
 
     return { operacion, comprobante, status, statusLabel: label, statusPercent: percent };
   }
